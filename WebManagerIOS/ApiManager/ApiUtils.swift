@@ -14,6 +14,7 @@ class ApiUtils {
       case none = ""
       case login = "user/login"
      case uploadImage = "image/upload"
+      
     }
 
     

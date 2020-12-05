@@ -21,15 +21,17 @@ class ViewController: UIViewController {
         // Do any additional setup after loading the view.
         
         
-        sendLogin()
-        uploadImage()
+       // sendLogin()
+       // uploadImage()
+         
        
     }
+   
     
     
     func uploadImage(){
         
-        var image = UIImage(named: "backImage")
+        let image = UIImage(named: "backImage")
         let imageData = image?.jpegData(compressionQuality: 0.2)
         if let _imageData = imageData {
             let apiManager =  ApiManager<ImageUpload>.Builder(pathUrl: .uploadImage, reqMethod: .post)
@@ -38,9 +40,7 @@ class ViewController: UIViewController {
                            partName: "image" ,
                            mimeType: .image,
                            extentionName: "JPG"
-                       )
-                       
-                       .build()
+                       ).build()
                    
                    apiManager.startAsMultiPart(onStart: {
                        print("start>>")
@@ -51,7 +51,7 @@ class ViewController: UIViewController {
                    }) { (respone, apiError) in
                        if apiError != nil {
                                   
-                          //error when code not 200(500,422,401..)
+                          //error when code not 200 >> (500,422,401..)
                           print(apiError?.errorMessage ?? "")
                           
                           if apiError?.errorCode == 401 {
@@ -60,10 +60,11 @@ class ViewController: UIViewController {
                           
                       }else{
             
-                           print(respone?.id)
+                        //success
+                         print(respone?.id)
                       }
                  
-                   }
+              }
         }
        
         
@@ -72,7 +73,7 @@ class ViewController: UIViewController {
     func sendLogin() {
         var parameters: [String: Any] = [:]
         
-        //    parameters["mobile"] = 1010101
+        //parameters["mobile"] = 1010101
         parameters["password"] = 101010
         
         
@@ -83,7 +84,7 @@ class ViewController: UIViewController {
         
         apiManager.start(
             onStart: {
-                //show progress
+            //show progress
                 
         }, onFinish: {
             //hide progress

@@ -47,6 +47,7 @@ class ApiManager<T:Codable>  {
         self.encoding =  builder.encoding
         self.pathUrl=builder.pathUrl
         self.token = builder.token
+        self.baseUrl = builder.baseUrl
         self.reqMethod =  builder.reqMethod
         self.multiPartFormDataStructList = builder.multiPartFormDataStructList
     }
@@ -86,10 +87,7 @@ class ApiManager<T:Codable>  {
                     fileName: "\(arc4random_uniform(100))_\(item.extentionName)",
                     mimeType: item.mimeType.rawValue)
             }
-            
-            
-            
-            
+             
         }, to:getFullUrl(),method: self.reqMethod,
            headers:self.headers)
         { (result) in
@@ -103,9 +101,7 @@ class ApiManager<T:Codable>  {
                     onProgress(progress.fractionCompleted)
                 })
                 
-                
                 onStart()
-                
                 upload.validate().responseJSON { response in
                     
                     if(response.result.isSuccess){
@@ -119,8 +115,7 @@ class ApiManager<T:Codable>  {
                             print("Error serializing  respone json", jsonErr)
                             completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode:  -1))
                         }
-                        
-                        
+                         
                     }else{
                         
                         do {
@@ -194,10 +189,8 @@ class ApiManager<T:Codable>  {
                                     print("Unknown error:  )")
                                     completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode: _statusCode))
                                 }
-                                
-                                
-                            }
                             
+                            }
                             
                         }
                     }
@@ -351,6 +344,7 @@ class ApiManager<T:Codable>  {
         }
         
         
+        
         func withHeaders(headers : [String : String]) -> Builder {
             self.headers =  headers
             return self
@@ -405,10 +399,7 @@ class ApiManager<T:Codable>  {
             partName : String,
             mimeType : MultiPartFormDataStruct.MimeType,
             extentionName : String = "")  -> Builder  {
-            
-            
-            
-            
+             
             if let _datas = datas{
                 for data in _datas {
                     
@@ -427,8 +418,7 @@ class ApiManager<T:Codable>  {
             return self
         }
         
-        
-        
+    
         func build() -> ApiManager {
             
             
