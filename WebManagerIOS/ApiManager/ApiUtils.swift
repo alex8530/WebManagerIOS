@@ -13,6 +13,7 @@ class ApiUtils {
     enum PathUrl : String{
       case none = ""
       case login = "user/login"
+     case uploadImage = "image/upload"
     }
 
     

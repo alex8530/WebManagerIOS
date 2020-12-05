@@ -9,6 +9,20 @@
 import Foundation
 import Alamofire
 
+struct MultiPartFormDataStruct {
+    
+    enum MimeType  :String {
+        case image = "image/jpeg"
+        case video = "video/mp4"
+        case pdf =  "application/pdf"
+    }
+    
+    var partName : String
+    var partData : Data
+    var mimeType : MimeType = .image
+    var extentionName : String = ""
+    
+}
 
 
 class ApiManager<T:Codable>  {
@@ -24,6 +38,8 @@ class ApiManager<T:Codable>  {
     
     
     
+    private(set) var multiPartFormDataStructList : [MultiPartFormDataStruct] = []
+    
     
     private init(builder :Builder ) {
         self.headers =  builder.headers
@@ -32,10 +48,171 @@ class ApiManager<T:Codable>  {
         self.pathUrl=builder.pathUrl
         self.token = builder.token
         self.reqMethod =  builder.reqMethod
+        self.multiPartFormDataStructList = builder.multiPartFormDataStructList
     }
     
     private func getFullUrl()->String{
         return self.baseUrl + self.pathUrl.rawValue
+    }
+    
+    
+    
+    func startAsMultiPart(
+        onStart : @escaping () -> Void,
+        onProgress : @escaping (_ progress : Double) -> Void,
+        onFinish : @escaping () -> Void,
+        completion: @escaping ((T?,ApiError?)->Void)){
+        
+        
+        
+        Alamofire.upload(multipartFormData: { (multipartFormData) in
+            
+            
+            //add parms
+            if let parms = self.parameters as? [String:String] {
+                
+                for (key, value) in parms {
+                    multipartFormData.append(value.data(using: .utf8)!, withName: key)
+                    
+                }
+            }
+            
+            //add parts
+            for item in self.multiPartFormDataStructList {
+                
+                multipartFormData.append(
+                    item.partData,
+                    withName: item.partName,
+                    fileName: "\(arc4random_uniform(100))_\(item.extentionName)",
+                    mimeType: item.mimeType.rawValue)
+            }
+            
+            
+            
+            
+        }, to:getFullUrl(),method: self.reqMethod,
+           headers:self.headers)
+        { (result) in
+            switch result {
+            case .success(let upload, _, _):
+                
+                
+                
+                upload.uploadProgress(closure: { (progress) in
+                    print("Upload Progress: \(progress.fractionCompleted)")
+                    onProgress(progress.fractionCompleted)
+                })
+                
+                
+                onStart()
+                
+                upload.validate().responseJSON { response in
+                    
+                    if(response.result.isSuccess){
+                        
+                        do {
+                            let responseData =  try JSONDecoder().decode(T.self, from: response.data!)
+                            
+                            print("Success : \r\n----\(response) ----")
+                            completion(responseData,nil)
+                        } catch let jsonErr {
+                            print("Error serializing  respone json", jsonErr)
+                            completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode:  -1))
+                        }
+                        
+                        
+                    }else{
+                        
+                        do {
+                            var statusCode = response.response?.statusCode
+                            if let _statusCode = statusCode {
+                                
+                                if _statusCode == 401 {
+                                    print("401 error --------")
+                                    completion(nil,ApiError(errorMessage: "un auth", errorCode: _statusCode))
+                                }else  if let error = response.result.error as? AFError {
+                                    
+                                    switch error {
+                                    case .invalidURL(let url):
+                                        print("Invalid URL: \(url) - \(error.localizedDescription)")
+                                        completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode: _statusCode))
+                                    case .parameterEncodingFailed(let reason):
+                                        print("Parameter encoding failed: \(error.localizedDescription)")
+                                        print("Failure Reason: \(reason)")
+                                        completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode: _statusCode))
+                                    case .multipartEncodingFailed(let reason):
+                                        print("Multipart encoding failed: \(error.localizedDescription)")
+                                        print("Failure Reason: \(reason)")
+                                        completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode: _statusCode))
+                                    case .responseValidationFailed(let reason):
+                                        //todo parse and get errors
+                                        print("Response validation failed: \(error.localizedDescription)")
+                                        print("Failure Reason: \(reason)")
+                                        
+                                        
+                                        do {
+                                            let json = try JSONSerialization.jsonObject(with: response.data!, options: []) as? [String : Any]
+                                            
+                                            let errors = json?["errors"] as? [[String]]
+                                            if let _errors = errors {
+                                                
+                                                completion(nil,ApiError(errorMessage: _errors.description.getStringMessageFromApiErrorValidation(), errorCode: _statusCode))
+                                            }
+                                            
+                                        } catch let error {
+                                            print("\(error)")
+                                            
+                                            completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode: _statusCode))
+                                        }
+                                        
+                                        switch reason {
+                                        case .dataFileNil, .dataFileReadFailed:
+                                            print("Downloaded file could not be read")
+                                        case .missingContentType(let acceptableContentTypes):
+                                            print("Content Type Missing: \(acceptableContentTypes)")
+                                        case .unacceptableContentType(let acceptableContentTypes, let responseContentType):
+                                            print("Response content type: \(responseContentType) was unacceptable: \(acceptableContentTypes)")
+                                        case .unacceptableStatusCode(let code):
+                                            print("Response status code was unacceptable: \(code)")
+                                            statusCode = code
+                                        }
+                                        
+                                        
+                                    case .responseSerializationFailed(let reason):
+                                        print("Response serialization failed: \(error.localizedDescription)")
+                                        print("Failure Reason: \(reason)")
+                                        
+                                        completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode: _statusCode))
+                                        
+                                    }
+                                    
+                                    print("Underlying error: ")
+                                } else if let error = response.result.error as? URLError {
+                                    print("URLError occurred: \(error)")
+                                    completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode: _statusCode))
+                                } else {
+                                    print("Unknown error:  )")
+                                    completion(nil,ApiError(errorMessage: "There was a problem, try Agin",errorCode: _statusCode))
+                                }
+                                
+                                
+                            }
+                            
+                            
+                        }
+                    }
+                    
+                    onFinish()
+                    
+                }
+                
+            case .failure(let encodingError):
+                print(encodingError)
+                completion(nil,ApiError(errorMessage: "There was a problem, try Agin \(encodingError.localizedDescription)",errorCode:  -1))
+            }
+            
+        }
+        
     }
     
     
@@ -160,11 +337,12 @@ class ApiManager<T:Codable>  {
         private(set) var token: String?=nil
         private(set) var encoding: ParameterEncoding = URLEncoding.default
         
-        
+        private(set) var multiPartFormDataStructList : [MultiPartFormDataStruct] = []
         
         init(pathUrl: ApiUtils.PathUrl ,reqMethod : HTTPMethod = .get   ) {
             self.pathUrl =   pathUrl
             self.reqMethod = reqMethod
+            self.multiPartFormDataStructList = []
         }
         
         func withBaseUrl(baseUrl : String) -> Builder {
@@ -198,6 +376,59 @@ class ApiManager<T:Codable>  {
         }
         
         
+        func withAddFile(
+            data :  Data?,
+            partName : String,
+            mimeType : MultiPartFormDataStruct.MimeType ,
+            extentionName : String = "" )  -> Builder  {
+            
+            
+            
+            
+            if let _data = data{
+                
+                multiPartFormDataStructList.append(
+                    MultiPartFormDataStruct(
+                        partName: partName,
+                        partData: _data,
+                        mimeType:mimeType ,
+                        extentionName: extentionName
+                ))
+            }
+            
+            return self
+        }
+        
+        
+        func withAddFiles(
+            datas :  [Data]?,
+            partName : String,
+            mimeType : MultiPartFormDataStruct.MimeType,
+            extentionName : String = "")  -> Builder  {
+            
+            
+            
+            
+            if let _datas = datas{
+                for data in _datas {
+                    
+                    multiPartFormDataStructList.append(
+                        MultiPartFormDataStruct(
+                            partName: partName,
+                            partData: data,
+                            mimeType: mimeType ,
+                            extentionName: extentionName
+                    ))
+                    
+                }
+                
+            }
+            
+            return self
+        }
+        
+        
+        
         func build() -> ApiManager {
             
             
@@ -207,7 +438,7 @@ class ApiManager<T:Codable>  {
                 }
             }
             
-             
+            
             self.headers["Content-Type"] = "application/x-www-form-urlencoded"
             self.headers["Accept"] = "application/json"
             

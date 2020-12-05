@@ -8,11 +8,68 @@
 
 import UIKit
 
+struct ImageUpload  : Codable{
+    var id : Int = 0
+}
+
 class ViewController: UIViewController {
+    
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
+        
+        
+        sendLogin()
+        uploadImage()
+       
+    }
+    
+    
+    func uploadImage(){
+        
+        var image = UIImage(named: "backImage")
+        let imageData = image?.jpegData(compressionQuality: 0.2)
+        if let _imageData = imageData {
+            let apiManager =  ApiManager<ImageUpload>.Builder(pathUrl: .uploadImage, reqMethod: .post)
+                       .withAddFile(
+                           data: _imageData,
+                           partName: "image" ,
+                           mimeType: .image,
+                           extentionName: "JPG"
+                       )
+                       
+                       .build()
+                   
+                   apiManager.startAsMultiPart(onStart: {
+                       print("start>>")
+                   }, onProgress: { (progress) in
+                       print("progress :: \(progress)")
+                   }, onFinish: {
+                       print("finish>>>")
+                   }) { (respone, apiError) in
+                       if apiError != nil {
+                                  
+                          //error when code not 200(500,422,401..)
+                          print(apiError?.errorMessage ?? "")
+                          
+                          if apiError?.errorCode == 401 {
+                              //clear UserDefault And SignOut
+                          }
+                          
+                      }else{
+            
+                           print(respone?.id)
+                      }
+                 
+                   }
+        }
+       
+        
+    }
+    
+    func sendLogin() {
         var parameters: [String: Any] = [:]
         
         //    parameters["mobile"] = 1010101
@@ -52,15 +109,10 @@ class ViewController: UIViewController {
                         //fail
                         print( _apiWrapper.message ?? "")
                     }
-                    
                 }
-                
             }
-            
-            
         })
     }
-    
     
 }
 
